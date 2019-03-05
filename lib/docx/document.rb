@@ -18,9 +18,10 @@ module Docx
   #     puts d.text
   #   end
   class Document
-    attr_reader :xml, :doc, :zip, :styles
+    attr_reader :path, :xml, :doc, :zip, :styles
 
     def initialize(path, &block)
+      @path = path
       @replace = {}
       @zip = Zip::File.open(path)
       @document_xml = @zip.read('word/document.xml')
@@ -52,6 +53,24 @@ module Docx
 
     def paragraphs
       @doc.xpath('//w:document//w:body//w:p').map { |p_node| parse_paragraph_from p_node }
+    end
+
+    def get_form_fields
+      @doc.xpath('//w:ffData').map do |node|
+        Elements::FormField.new(node)
+      end
+    end
+
+    def set_value_for_form_field(hash)
+      form_fields = get_form_fields
+      hash.each do |name, value|
+        field = form_fields.find {|field| field.name == name }
+        next unless field
+        field.set_value_for_form_field(value)
+      end
+      Zip::File.open(path) do |zip|
+        zip.get_output_stream('word/document.xml') { |f| f.puts doc.to_s }
+      end
     end
 
     def bookmarks
