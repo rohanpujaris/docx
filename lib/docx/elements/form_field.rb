@@ -57,7 +57,7 @@ module Docx
       end
 
       def get_value_for_text_field
-        Elements::Containers::Paragraph.new(ancestor_paragraph).to_s
+        ancestor_paragraph.xpath("w:r/w:instrText/ancestor::w:r/following-sibling::w:r/w:t").map(&:text).join(" ")
       end
 
       def get_value_for_checkbox_field
@@ -87,7 +87,7 @@ module Docx
 
       def set_value_for_text_field(value)
         # Should not delete all w:r node. Instead should delete it from bookmark start to bookmar end
-        ancestor_paragraph.xpath("descendant::w:t/parent::w:r").each_with_index do |node, index|
+        ancestor_paragraph.xpath("w:r/w:instrText/ancestor::w:r/following-sibling::w:r/w:t/parent::w:r").each_with_index do |node, index|
           if index == 0
             node.xpath('w:t').first.content = value
           else
@@ -103,15 +103,21 @@ module Docx
             new_node = Nokogiri::XML("<w:checked/>").root
             node.xpath("descendant::w:checkBox").first.add_child(new_node)
           end
-        elsif value
-          node.xpath("descendant::w:checked").first.remove
+        else
+          node.xpath("descendant::w:checked").first&.remove
         end
       end
 
       def set_value_for_dropdown_field(value)
         index = meta[:options].index(value)
         if index
-          node.xpath("descendant::w:result").first["w:val"] = index
+          result_node = node.xpath("descendant::w:result").first
+          if result_node
+            result_node["w:val"] = index
+          else
+            new_node = Nokogiri::XML("<w:result w:val='#{index}'/>").root
+            node.xpath("descendant::w:ddList").first.add_child(new_node)
+          end
         end
       end
 
@@ -125,8 +131,19 @@ end
 # data = {
 #   "first_name" => "Rohan",
 #   "last_name" => "Pujari",
-#   "male" => true,
-#   "qualification" => "graduate"
+#   "english" => true,
+#   "french" => false,
+#   "spanish" => false,
+#   "qualification" => "Graduate"
 # }
-# Docx::Document.open('example3.docx').set_value_for_form_field(data, flatten: true)
-# Docx::Document.open('example3.docx').get_form_fields.map(&:to_h)
+
+# data = {
+#   "first_name" => "Kavita",
+#   "last_name" => "Joshi",
+#   "english" => true,
+#   "french" => false,
+#   "spanish" => true,
+#   "qualification" => "Post Graduate"
+# }
+# Docx::Document.open('fillable_form.docx').set_value_for_form_field(data, flatten: true)
+# Docx::Document.open('fillable_form.docx').get_form_fields.map(&:to_h)
