@@ -1,4 +1,5 @@
 require 'docx/elements/element'
+require "byebug"
 
 module Docx
   module Elements
@@ -10,14 +11,22 @@ module Docx
         'ffData'
       end
 
-      attr_reader :node, :ancestor_paragraph, :type, :name, :value
+      attr_reader :node, :ancestor_paragraph, :type, :name, :value, :meta
 
       def initialize(node)
         @node = node
         @ancestor_paragraph = node.xpath("ancestor::w:p").first
         @type = get_type_for_form_field
         @name = get_name_for_form_field
+        @meta = get_meta_value_for_form_field
         @value = get_value_for_form_field
+      end
+
+      def get_meta_value_for_form_field
+        return {} if type != "dropdown"
+        {
+          options: node.xpath("descendant::w:listEntry").map {|n| n["w:val"] }
+        }
       end
 
       def get_type_for_form_field
@@ -52,11 +61,17 @@ module Docx
       end
 
       def get_value_for_checkbox_field
-          # Cases of default checked checkboxes need to be handled here
+        # Cases of default checked checkboxes need to be handled here
         !ancestor_paragraph.xpath('descendant::w:r[1]/descendant::w:checked').empty?
       end
 
       def get_value_for_dropdown_field
+        selected_option = node.xpath("descendant::w:result").first
+        if selected_option
+          meta[:options][selected_option["w:val"].to_i]
+        else
+          meta[:options].first
+        end
       end
 
       def set_value_for_form_field(value)
@@ -71,6 +86,7 @@ module Docx
       end
 
       def set_value_for_text_field(value)
+        # Should not delete all w:r node. Instead should delete it from bookmark start to bookmar end
         ancestor_paragraph.xpath("descendant::w:t/parent::w:r").each_with_index do |node, index|
           if index == 0
             node.xpath('w:t').first.content = value
@@ -80,10 +96,23 @@ module Docx
         end
       end
 
-      def set_value_for_checkbox_field(value)
+      def set_value_for_checkbox_field(checked)
+        # Cases of default checked checkboxes need to be handled here
+        if checked
+          unless value
+            new_node = Nokogiri::XML("<w:checked/>").root
+            node.xpath("descendant::w:checkBox").first.add_child(new_node)
+          end
+        elsif value
+          node.xpath("descendant::w:checked").first.remove
+        end
       end
 
       def set_value_for_dropdown_field(value)
+        index = meta[:options].index(value)
+        if index
+          node.xpath("descendant::w:result").first["w:val"] = index
+        end
       end
 
       def to_h
@@ -93,4 +122,11 @@ module Docx
   end
 end
 
-# Docx::Document.open('example1.docx').set_value_for_form_field("Name" => "LLL")
+# data = {
+#   "first_name" => "Rohan",
+#   "last_name" => "Pujari",
+#   "male" => true,
+#   "qualification" => "graduate"
+# }
+# Docx::Document.open('example3.docx').set_value_for_form_field(data, flatten: true)
+# Docx::Document.open('example3.docx').get_form_fields.map(&:to_h)

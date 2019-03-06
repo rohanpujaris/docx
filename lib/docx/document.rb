@@ -2,6 +2,7 @@ require 'docx/containers'
 require 'docx/elements'
 require 'nokogiri'
 require 'zip'
+require 'libreconv'
 
 module Docx
   # The Document class wraps around a docx file and provides methods to
@@ -61,7 +62,7 @@ module Docx
       end
     end
 
-    def set_value_for_form_field(hash)
+    def set_value_for_form_field(hash, flatten: false)
       form_fields = get_form_fields
       hash.each do |name, value|
         field = form_fields.find {|field| field.name == name }
@@ -70,6 +71,10 @@ module Docx
       end
       Zip::File.open(path) do |zip|
         zip.get_output_stream('word/document.xml') { |f| f.puts doc.to_s }
+      end
+      if flatten
+        file_name = File.basename(path, ".docx")
+        Libreconv.convert(path, "#{file_name}.pdf")
       end
     end
 

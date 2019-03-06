@@ -14,6 +14,7 @@ Gem::Specification.new do |s|
 
   s.add_dependency 'nokogiri', '~> 1.8', '>= 1.8.1'
   s.add_dependency 'rubyzip',  '~> 1.2', '>= 1.2.1'
+  s.add_dependency 'libreconv'
 
   s.add_development_dependency 'rspec', '~> 3.7'
   s.add_development_dependency 'rake', '~> 12.3'
